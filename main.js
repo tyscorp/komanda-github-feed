@@ -10,12 +10,12 @@ module.exports = function() {
 
   // These settings are required to activate jquery's CORS compatibility for cross-site AJAX requests.
   $.support.cors = true;
-  $.ajaxSettings.xhr = function() {
+  $.ajaxSettings.xhr = function () {
     return new XMLHttpRequest();
   }
 
   // A template helper to compare github action types.
-  function ifGithubType(type, options) {
+  function ifGithubType (type, options) {
     if (this.type === type) {
       return options.fn(this); 
     } else {
@@ -33,13 +33,12 @@ module.exports = function() {
     smartLists: true,
     smartypants: false,
     highlight: function (code) {
-      console.log("CODE", code);
       return highlightjs.highlightAuto(code).value;
     }
   });
 
   // A template helper function to format markdown text.
-  function markdown(text) {
+  function markdown (text) {
     return marked(text);
   };
 
@@ -50,7 +49,7 @@ module.exports = function() {
   return {
 
     // public: required
-    initialize: function(args) {
+    initialize: function (args) {
       var self = this;
       if (_.has(args, "channelAPI")) {
         self.channelAPI = args.channelAPI;
@@ -67,13 +66,12 @@ module.exports = function() {
       };
 
       // hook into the channel's topic change event
-      self.channelAPI.onChannelTopicChange(function (topic) {
-        self.consumeTopic(topic);
-      });
+      self.channelAPI.onChannelTopicChange(self.consumeTopic.bind(self));
 
-      self.githubUpdateFunction = function() {
-        self.updateAndRender(function(r) {
-          if (r.feed[0]) {
+      self.githubUpdateFunction = function () {
+        self.updateAndRender()
+        .then(function (r) {
+          if (r && r.feed[0]) {
             if (r.feed[0].id !== self.last_feed_id) {
               // .. add new feed items to channel
               var newFeedItems = self.newFeeditems(r.feed);
@@ -98,7 +96,7 @@ module.exports = function() {
       };
     },
 
-    newFeeditems: function(feed) {
+    newFeeditems: function (feed) {
       var self = this;
 
       var newFeedItems = [];
@@ -121,7 +119,7 @@ module.exports = function() {
       };
     },
 
-    consumeTopic: function(topic) {
+    consumeTopic: function (topic) {
       // receives a topic string from komanda and parses to see if this plugin can act on any URLs in the topic.
       var self = this;
       self.topic = topic;
@@ -158,59 +156,56 @@ module.exports = function() {
       if (self.githubUpdateCheck) clearInterval(self.githubUpdateCheck);
     },
 
-    pluginReDraw: function(callback) {
+    pluginReDraw: function (callback) {
       var self = this;
 
-      self.updateAndRender(function(repo) {
+      self.updateAndRender().then(function (repo) {
         if (self.githubUpdateCheck) clearInterval(self.githubUpdateCheck);
         self.githubUpdateCheck = setInterval(self.githubUpdateFunction, 60000);
 
-        if (_.isFunction(callback)) callback(repo);
+        if (_.isFunction(callback) && repo) callback(repo);
       });
-
     },
 
-    updateAndRender: function(callback, errorback) {
-     var self = this;
+    updateAndRender: function () {
+      var self = this;
 
-      if (!_.isFunction(callback)) callback = _.noop;
-      if (!_.isFunction(errorback)) errorback = _.noop;
-
-      Promise.resolve($.ajax({
-        url: self.metadataURL,
-        dataType: "json",
-        type: "get",
-        ifModified: true
-      }))
-      .then(function(metadata) {
-        return Promise.resolve($.ajax({
+      return Promise.all([
+        Promise.resolve($.ajax({
+          url: self.metadataURL,
+          dataType: "json",
+          type: "get",
+          ifModified: true
+        })),
+        Promise.resolve($.ajax({
           url: self.feedURL,
           dataType: "json",
           type: "get",
           ifModified: true
         }))
-        .then(function(feed) {
-          if (metadata && !_.isEmpty(metadata)) {
-            self.repo.metadata = metadata;
-          }
+      ])
+      .spread(function(metadata, feed) {
+        if (metadata && !_.isEmpty(metadata)) {
+          self.repo.metadata = metadata;
+        }
 
-          if (feed && feed.length > 0) {
-            self.repo.feed = feed;
-          }
-          return self.repo;
-        });
+        if (feed && feed.length > 0) {
+          self.repo.feed = feed;
+        }
+        return self.repo;
       })
-      .catch(errorback)
-      .then(callback);
+      .catch(function (error) {
+        console.log("Error Getting Feed\n", error.stack);
+      });
     },
 
     // public: required
-    close: function() {
+    close: function () {
       var self = this;
+
       if (self.githubUpdateCheck) clearInterval(self.githubUpdateCheck);
+
       self.githubUpdateFunction = null;
     }
-    
   };
-
 }

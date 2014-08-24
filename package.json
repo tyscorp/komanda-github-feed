@@ -1,7 +1,11 @@
 {
   "name": "komanda-github-feed",
   "description": "github plugin for the Komanda IRC client",
-  "version": "0.0.1",
+  "repository": {
+    "type": "git",
+    "url": "http://github.com/tyscorp/komanda-github-feed.git"
+  },
+  "version": "0.0.2",
   "dependencies": {
     "bluebird": "^2.1.3",
     "hbs": "^2.7.0",
